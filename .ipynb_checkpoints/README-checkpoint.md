@@ -27,4 +27,5 @@ python train_translate_nystorm.py
 
 ### Credits
 Simple Transformer Implementaiton: https://github.com/IpsumDominum/Pytorch-Simple-Transformer
+
 Nystromformer: https://arxiv.org/pdf/2102.03902
