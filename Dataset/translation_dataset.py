@@ -13,30 +13,33 @@ import time
 class EnglishToGermanDataset(torch.utils.data.Dataset):
     def __init__(self, CUDA=False):
         super(EnglishToGermanDataset, self).__init__()
+        self.CUDA = CUDA
+        self.device = torch.device("cuda:0" if CUDA else "cpu")
+
         print("LOADING GERMAN SENTENCES")
         load = torch.load(os.path.join("Dataset", "German_sentences.pkl"))
-        self.german_sentences_train = load["train_data"]
-        self.german_sentences_test = load["test_data"]
+        self.german_sentences_train = [sentence.to(self.device) for sentence in load["train_data"]]
+        self.german_sentences_test = [sentence.to(self.device) for sentence in load["test_data"]]
         self.german_max_len = load["max_len"]
         self.german_min_len = load["min_len"]
         self.german_vocab_len = load["vocab_len"]
         self.german_vocab = load["vocab"]
         self.german_vocab_reversed = load["vocab_reversed"]
         self.german_eos = self.german_vocab["<end>"]
+
         print("LOADING ENGLISH SENTENCES")
         load = torch.load(os.path.join("Dataset", "English_sentences.pkl"))
-        self.english_sentences_train = load["train_data"]
-        self.english_sentences_test = load["test_data"]
+        self.english_sentences_train = [sentence.to(self.device) for sentence in load["train_data"]]
+        self.english_sentences_test = [sentence.to(self.device) for sentence in load["test_data"]]
         self.english_max_len = load["max_len"]
         self.english_min_len = load["min_len"]
         self.english_vocab_len = load["vocab_len"]
         self.english_vocab = load["vocab"]
         self.english_vocab_reversed = load["vocab_reversed"]
+
         self.mode = "train"
         self.english_eos = self.english_vocab["<end>"]
-        self.min_len = 30  # min(self.german_min_len,self.english_min_len)
-        self.CUDA = CUDA
-        self.device = torch.device("cuda:0" if CUDA else "cpu")
+        self.min_len = 30  # min(self.german_min_len, self.english_min_len)
 
     def logit_to_sentence(self, logits, language="german"):
         if language == "german":
@@ -57,7 +60,7 @@ class EnglishToGermanDataset(torch.utils.data.Dataset):
         self.mode = "train"
 
     def __getitem__(self, idx):
-        torch.set_default_tensor_type(torch.FloatTensor)
+        
         if self.mode == "test":
             german_item = self.german_sentences_test[idx]
             english_item = self.english_sentences_test[idx]
@@ -65,8 +68,8 @@ class EnglishToGermanDataset(torch.utils.data.Dataset):
             german_item = self.german_sentences_train[idx]
             english_item = self.english_sentences_train[idx]
         min_len = min(len(german_item), len(english_item))
-        start_token = torch.tensor([self.german_vocab["<start>"]], dtype=torch.int64)
-        end_token = torch.tensor([self.german_vocab["<end>"]], dtype=torch.int64)
+        start_token = torch.tensor([self.german_vocab["<start>"]], dtype=torch.int64, device=self.device)
+        end_token = torch.tensor([self.german_vocab["<end>"]], dtype=torch.int64, device=self.device)
         if min_len > self.min_len:
             # Crop randomly
             crop_range = min(len(german_item), len(english_item)) - self.min_len
@@ -74,7 +77,7 @@ class EnglishToGermanDataset(torch.utils.data.Dataset):
             german_item = german_item[crop : self.min_len + crop]
             english_item = english_item[crop : self.min_len + crop]
             german_item = torch.cat((start_token, german_item,end_token))
-            logit_mask = torch.ones((len(german_item), 1), dtype=torch.bool)
+            logit_mask = torch.ones((len(german_item), 1), dtype=torch.float, device=self.device)
         else:
             german_item = F.pad(
                 german_item,
@@ -93,10 +96,8 @@ class EnglishToGermanDataset(torch.utils.data.Dataset):
             logit_mask = torch.ones((len(german_item), 1), dtype=torch.bool)
             logit_mask[min_len + 1 :, :] = 0
         german_logits = torch.zeros((len(german_item), self.german_vocab_len))
-        index = torch.arange(0, len(german_item))
+        index = torch.arange(0, len(german_item), device=self.device)
         german_logits[index, german_item] = 1
-        if self.CUDA:
-            torch.set_default_tensor_type(torch.cuda.FloatTensor)
         return {
             "german": german_item.to(self.device),
             "english": english_item.to(self.device),

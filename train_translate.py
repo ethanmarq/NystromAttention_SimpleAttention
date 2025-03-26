@@ -32,12 +32,21 @@ use_teacher_forcing = False
 device = torch.device("cuda:0" if CUDA else "cpu")
 
 """
+CUDA random number generator
+"""
+if CUDA:
+    generator = torch.Generator(device="cuda:0")
+else:
+    generator = torch.Generator(device="cpu")
+
+
+"""
 Dataset
 """
 dataset = EnglishToGermanDataset(CUDA=CUDA)
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=generator)
 dataloader_test = torch.utils.data.DataLoader(
-    dataset, batch_size=batch_size, shuffle=True
+    dataset, batch_size=batch_size, shuffle=True, generator=generator
 )
 
 """

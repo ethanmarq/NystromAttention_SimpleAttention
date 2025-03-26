@@ -1,29 +1,30 @@
-# Simple Transformer
+# Nystorm vs Simple Transformer
 
-An implementation of the "Attention is all you need" paper without extra bells and whistles,
-or difficult syntax.
+Nystrom Attention applies the nystorm attention to the matrix multiplicaiton of Self-Attention.
 
-Note: The only extra thing added is Dropout regularization in some layers and option to use GPU. Also, a lot more steps might be needed to get the model to work very well. For instance, improving the inference speed, or have a schedule to shift away from teacher forcing. I haven't experimented much with those, and this repository is meant for a reference to the basic transformer setup. It's complementary to other blog posts/videos/paper one might find online.
 
-### Install
+### Install Requirements
 ```
 python -m pip install -r requirements.txt
 ```
 
-### Toy data
-```
-python train_toy_data.py
-```
-
-![Image](Extra_Scripts/toy_data.gif)
-
 ### English -> German Europarl dataset
+
+Multi-Head Attention Transformer
 ```
 python train_translate.py
 ```
 
-Training on a small subset of 1000 sentences (Included in this repo)
-![Image](Extra_Scripts/Loss.png)
+Nystrom Attention Transformer
+```
+python train_translate_nystorm.py
+```
+
+### Plot Loss for training checkpoint.pkl
+
+`Nystrom-Simple-Transformer/Extra_Scripts/plot_loss.ipynb`
 
 
-
+### Credits
+Simple Transformer Implementaiton: https://github.com/IpsumDominum/Pytorch-Simple-Transformer
+Nystromformer: https://arxiv.org/pdf/2102.03902
