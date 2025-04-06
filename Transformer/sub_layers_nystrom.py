@@ -45,7 +45,7 @@ class NystromSelfAttention(nn.Module):
         value = self.value_embed(value_in)
         
         # Scale for stability
-        scaling = 1.0 / math.sqrt(self.d_k)
+        scaling = 1.0 / math.sqrt(math.sqrt(self.d_k))
         query = query * scaling
         key = key * scaling
         
@@ -119,14 +119,17 @@ class NystromSelfAttention(nn.Module):
                 # 2. Compute the three Nystrom kernels
                 # kernel_1: [batch_size, seq_len, num_landmarks]
                 kernel_1 = torch.matmul(query, k_landmarks.transpose(-1, -2))
+
                 kernel_1 = F.softmax(kernel_1, dim=-1)
                 
                 # kernel_2: [batch_size, num_landmarks, num_landmarks]
                 kernel_2 = torch.matmul(q_landmarks, k_landmarks.transpose(-1, -2))
+
                 kernel_2 = F.softmax(kernel_2, dim=-1)
                 
                 # kernel_3: [batch_size, num_landmarks, seq_len]
                 kernel_3 = torch.matmul(q_landmarks, key.transpose(-1, -2))
+
                 
                 if self.mask:
                     if is_decoder_self_attn:
@@ -147,7 +150,7 @@ class NystromSelfAttention(nn.Module):
                 # 3. Compute Nystrom approximation
                 # Moore-Penrose pseudoinverse of kernel_2
                 kernel_2_inv = torch.pinverse(kernel_2)
-                #kernel_2_inv = self.iterative_inv(kernel_2) # Debugging as there is a shape mismathc
+                #kernel_2_inv = self.iterative_inv(kernel_2) # Debugging as there is a shape mismatch
                 
                 # Final Nystrom approximation
                 attention_weighted_value = torch.matmul(
