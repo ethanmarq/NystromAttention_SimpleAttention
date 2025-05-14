@@ -1,8 +1,17 @@
+"""
+This script is RRLS and can be run using: python standalone_RRLS.py
+
+It runs on random data using the following parameters:    
+    N_points = 1000
+    d_features = 64
+    n_landmarks = 50
+    gamma_value = 0.01
+"""
 import torch
 import math # For standard math functions if needed
 
 # ================================================
-# Example PyTorch Kernel Function (Gaussian/RBF)
+#  PyTorch Kernel Function (Gaussian/RBF)
 # ================================================
 def torch_gauss_kernel(X: torch.Tensor, Y: torch.Tensor = None, gamma: float = 0.01):
     """

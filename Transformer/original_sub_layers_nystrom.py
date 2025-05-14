@@ -1,3 +1,6 @@
+"""
+This is Nystorm Attention without RRLS it is a backup
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

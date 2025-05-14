@@ -1,3 +1,8 @@
+"""
+This is the script that attempts to implement batched RRLS and is used in the pipeline
+
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

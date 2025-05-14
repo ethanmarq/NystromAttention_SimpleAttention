@@ -1,3 +1,11 @@
+"""
+This is a similar iteration of standalone RRLS that is more concise
+but it will not run currently, there is no main.
+
+
+
+"""
+
 import torch
 import math
 
