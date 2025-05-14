@@ -379,28 +379,9 @@ class NystromSelfAttention(nn.Module):
                     # q_landmarks should probably be query itself for interaction with k_landmarks
                     q_landmarks = query # Shape: [B, 1, Dk]
                 else:
-""" # This part should never be run
-                    if q_seq_len == k_seq_len and k_seq_len > 0 and landmark_indices_tensor.numel() > 0 :
-                         q_landmarks = torch.gather(query, 1, landmark_indices_tensor.unsqueeze(-1).expand(-1, -1, self.d_k))
-                    elif k_seq_len > 0 and landmark_indices_tensor.numel() > 0 : # q_seq_len != k_seq_len, or other mismatch
-                        # Fallback: Use mean of queries as q_landmarks, similar to original Nystrom idea
-                        # This is a simplification if RLS indices from keys don't apply well to queries.
-                        # Ensure query has enough elements to segment or average.
-                        if q_seq_len >= effective_num_landmarks and effective_num_landmarks > 0:
-                            # Simple averaging if q_seq_len is divisible, otherwise more complex.
-                            # For simplicity, let's use a strided slice or mean of all queries if not easily segmentable.
-                            # This is a placeholder, proper q_landmark selection here is important.
-                            # One simple approach: take the first 'effective_num_landmarks' queries if available
-                            q_sel_indices = torch.arange(min(q_seq_len, effective_num_landmarks), device=self.device).unsqueeze(0).expand(batch_size, -1)
-                            q_landmarks = torch.gather(query, 1, q_sel_indices.unsqueeze(-1).expand(-1, -1, self.d_k))
-                        elif q_seq_len > 0 : # q_seq_len < effective_num_landmarks
-                             q_landmarks = query.mean(dim=1, keepdim=True).expand(-1, effective_num_landmarks, -1) # Repeat mean query
-                        else: # q_seq_len is 0
-                             q_landmarks = torch.empty(batch_size, 0, self.d_k, device=self.device, dtype=query.dtype)
-
-                    else: # k_seq_len is 0, so no k_landmarks, q_landmarks also effectively empty for matmuls
-                        q_landmarks = torch.empty(batch_size, 0, self.d_k, device=self.device, dtype=query.dtype)
-"""
+                    # This is wrong, but this conditional always evaluate true
+                    query_reshaped = query.reshape(batch_size, num_landmarks, segments, -1)
+                    q_landmarks = query_reshaped.mean(dim=2)
 
                 # --- 2. Compute the three Nystrom kernels ---
                 if k_landmarks.shape[1] == 0: # No landmarks selected or k_seq_len was 0
