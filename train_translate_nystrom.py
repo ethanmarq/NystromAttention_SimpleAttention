@@ -25,11 +25,11 @@ num_heads = 1  # Must be factor of token size
 max_context_length = 1000
 # Must divide typical sequence length
 #(Will be automatically reduced when training to be divisiable)
-num_landmarks = 10   
+num_landmarks = 10  
 conv_kernel_size=None
 
-num_epochs = 1
-learning_rate = 1e-3
+num_epochs = 3
+learning_rate = 1e-5
 
 use_teacher_forcing = False
 
@@ -205,5 +205,5 @@ for epoch in range(num_epochs):
                     "train_losses": train_losses,
                     "test_losses": test_losses,
                 },
-                os.path.join("Checkpoints", "Checkpoint" + str(num_steps) + ".pkl"),
+                os.path.join("Checkpoints", "Checkpoint" + str(num_steps) + "_nystrom.pkl"),
             )

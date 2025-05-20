@@ -10,20 +10,8 @@ import math
 #  PyTorch Kernel Function (Gaussian/RBF) 
 # ================================================
 def _torch_gauss_kernel(X: torch.Tensor, Y: torch.Tensor = None, gamma: float = 0.01):
-    """
-    Computes the Gaussian (RBF) kernel between X and Y using PyTorch.
-    K(x, y) = exp(-gamma * ||x - y||^2)
 
-    Args:
-        X: Tensor of shape (N, d)
-        Y: Optional tensor of shape (M, d). If None, computes diagonal K(X, X).
-        gamma: Kernel bandwidth parameter.
-
-    Returns:
-        If Y is None: Tensor of shape (N,) containing K(X_i, X_i) [which is 1.0 for RBF].
-        If Y is not None: Tensor of shape (N, M) containing K(X_i, Y_j).
-    """
-    X = X.float() # Ensure float type for calculations
+    X = X.float() 
     if Y is None:
         return torch.ones(X.shape[0], device=X.device, dtype=X.dtype)
     else:
@@ -45,20 +33,7 @@ def _recursive_nystrom_pytorch(
     random_seed: int = None,
     return_leverage_score: bool = False
 ):
-    """
-    PyTorch implementation of Recursive Nystrom using Ridge Leverage Scores.
-    Selects n_components landmark indices from X based on RLS computed recursively.
-    Args:
-        X: Input data tensor (N, d).
-        n_components: Number of landmarks to select (m).
-        kernel_func: Kernel function.
-        lmbda_0: Minimum regularization value factor.
-        random_seed: Optional integer seed.
-        return_leverage_score: If True, returns leverage scores.
-    Returns:
-        indices: Tensor of selected landmark indices.
-        leverage_score (optional): Tensor of leverage scores.
-    """
+
     N = X.shape[0]
     device = X.device
     dtype = X.dtype
@@ -179,7 +154,7 @@ def _recursive_nystrom_pytorch(
                     lmbda_calc = (trace_weighted_SKS - sum_largest_k_eigvals) / current_k
                     lmbda_calc = torch.clamp(lmbda_calc, min=0.0)
                     lmbda_val = torch.maximum(torch.tensor(lmbda_0 * num_landmarks_in_sample, device=device, dtype=dtype), lmbda_calc)
-            except torch.linalg.LinAlgError:
+            except torch.linalg.LinAlgError: # Removed 'as e' as e is not used
                 # print(f"Warning: Eigenvalue computation failed at level {l}. Using fallback lambda.")
                 lmbda_val = torch.tensor(lmbda_0 * num_landmarks_in_sample + 1e-5, device=device, dtype=dtype)
             except Exception: # Removed 'as e'
@@ -226,7 +201,7 @@ def _recursive_nystrom_pytorch(
             
             if p.numel() > 0 and final_n_components > 0:
                 sampled_relative_indices = torch.multinomial(p, num_samples=final_n_components, replacement=False, generator=generator)
-                final_indices = perm[sampled_relative_indices] # These are absolute indices in original X
+                final_indices = perm[sampled_relative_indices] 
             else:
                 final_indices = torch.tensor([], dtype=torch.long, device=device)
 
@@ -277,14 +252,14 @@ Nystrom Code
 """
 class NystromSelfAttention(nn.Module):
     def __init__(self, embed_dim, d_k, d_v, num_landmarks, mask=False, CUDA=False, conv_kernel_size=None,
-                 rrls_gamma=0.01, rrls_lmbda_0=1e-6): # Added RRLS params
+                 rrls_gamma=0.01, rrls_lmbda_0=1e-6): 
         super(NystromSelfAttention, self).__init__()
         self.query_embed = nn.Linear(embed_dim, d_k)
         self.key_embed = nn.Linear(embed_dim, d_k)
         self.value_embed = nn.Linear(embed_dim, d_v)
         self.d_k = d_k
         self.mask = mask
-        self.num_landmarks = num_landmarks # This is the target M
+        self.num_landmarks = num_landmarks 
         self.dropout = nn.Dropout(0.1)
         self.CUDA = CUDA
         self.device = torch.device("cuda:0" if CUDA else "cpu")
@@ -292,8 +267,7 @@ class NystromSelfAttention(nn.Module):
 
         self.rrls_gamma = rrls_gamma
         self.rrls_lmbda_0 = rrls_lmbda_0
-        # Optional for deterministic RRLS landmark selection per call
-        # self.rrls_seed_counter = 0 # Example if you want different seeds each time
+        # self.rrls_seed_counter = 0 # Optional
 
         self.use_conv = conv_kernel_size is not None
         if self.use_conv:
@@ -307,11 +281,11 @@ class NystromSelfAttention(nn.Module):
 
     def _sample_landmarks_rrls(self, tensor_3d, target_num_landmarks):
         batch_size = tensor_3d.shape[0]
-        # seq_len_dim = tensor_3d.shape[1] # Not directly used here, but per item
+        # seq_len_dim = tensor_3d.shape[1] 
         d_features = tensor_3d.shape[2]
         
         landmark_list = []
-        # For reproducibility:
+        # Optional
         # current_seed = self.rrls_seed_counter if hasattr(self, 'rrls_seed_counter') else None
         # if current_seed is not None: self.rrls_seed_counter +=1
 
@@ -329,22 +303,22 @@ class NystromSelfAttention(nn.Module):
                     n_components=target_num_landmarks,
                     kernel_func=lambda x, y=None: _torch_gauss_kernel(x, y, gamma=self.rrls_gamma),
                     lmbda_0=self.rrls_lmbda_0,
-                    random_seed=None, # Or pass a seed, e.g. current_seed + i for per-item determinism
+                    random_seed=None, 
                     return_leverage_score=False
                 )
 
             num_selected = selected_indices_item.shape[0]
             if num_selected > 0:
                 landmarks_item = current_item[selected_indices_item, :]
-            else: # No indices selected (e.g., current_seq_len was 0 or RRLS returned empty)
+            else: # No indices selected
                 landmarks_item = torch.zeros((0, d_features), device=self.device, dtype=tensor_3d.dtype)
 
-            # Pad if fewer landmarks were selected/available 
+            # Pad if fewer landmarks were selected/available
             if num_selected < target_num_landmarks:
                 padding_size = target_num_landmarks - num_selected
                 padding = torch.zeros((padding_size, d_features), device=self.device, dtype=tensor_3d.dtype)
                 landmarks_item = torch.cat([landmarks_item, padding], dim=0)
-            elif num_selected > target_num_landmarks: # Should not occur if RRLS respects n_components
+            elif num_selected > target_num_landmarks:
                 landmarks_item = landmarks_item[:target_num_landmarks, :]
                 
             landmark_list.append(landmarks_item)
@@ -371,8 +345,8 @@ class NystromSelfAttention(nn.Module):
             mask_tensor = torch.tril(mask_tensor)
 
         is_decoder_self_attn = (q_seq_len == 1 and k_seq_len > 1)
-        use_nystrom = True # As per original training script
-
+        use_nystrom = True 
+        
         # `actual_landmarks_dim` will be self.num_landmarks due to padding in _sample_landmarks_rrls
         actual_landmarks_dim = self.num_landmarks
 
@@ -405,25 +379,20 @@ class NystromSelfAttention(nn.Module):
                     # Determine Q_L_dim for masking kernel_3
                     q_l_dim_for_mask = 1 if is_decoder_self_attn else actual_landmarks_dim
                     
-                    if is_decoder_self_attn: # q_seq_len (and q_l_dim_for_mask) is 1
-                        # Causal mask for the single query token attending to keys
-                        # seq_mask_k3 should be (B, 1, K_len)
+                    if is_decoder_self_attn: 
                         seq_mask_k3 = torch.ones(batch_size, 1, k_seq_len, device=self.device)
-                        _mask_k3 = torch.ones(batch_size, q_l_dim_for_mask, k_seq_len, device=self.device)
                         
-                        if q_seq_len == 1: # Decoder-like single query token
-                             indices_to_zero = torch.arange(1, k_seq_len, device=self.device)
+                        _mask_k3 = torch.ones(batch_size, q_l_dim_for_mask, k_seq_len, device=self.device)
+                        if q_seq_len == 1: 
                             
+                             indices_to_zero = torch.arange(1, k_seq_len, device=self.device)
                              if indices_to_zero.numel() > 0:
                                 _mask_k3[:, :, indices_to_zero] = 0
-                                 
-                        else: # Encoder self-attention or Q_len > 1 for decoder context
-                            # Standard lower triangular mask for (Q_L_dim, K_len) assuming landmarks correspond to query positions
+                        else: 
                             _mask_k3 = torch.tril(_mask_k3)
                         kernel_3 = kernel_3.masked_fill(_mask_k3 == 0, float('-inf'))
 
-                    else: # Not is_decoder_self_attn (q_l_dim_for_mask is actual_landmarks_dim)
-                        # Standard causal mask for landmarks attending to keys
+                    else: 
                         _mask_k3 = torch.ones(batch_size, actual_landmarks_dim, k_seq_len, device=self.device)
                         _mask_k3 = torch.tril(_mask_k3) # (B, M, K_len)
                         kernel_3 = kernel_3.masked_fill(_mask_k3 == 0, float('-inf'))
@@ -432,38 +401,36 @@ class NystromSelfAttention(nn.Module):
                 
                 # Moore-Penrose pseudoinverse of kernel_2
                 # kernel_2 shape: (B, Q_L_dim, M)
-                if kernel_2.size(-2) == 0 or kernel_2.size(-1) == 0: # Q_L_dim or M is 0
-                     #This case implies no landmarks, pinverse will fail. Fallback.
+                if kernel_2.size(-2) == 0 or kernel_2.size(-1) == 0: 
                      raise RuntimeError("kernel_2 has zero dimension, cannot compute pinverse.")
                 kernel_2_inv = torch.pinverse(kernel_2)
-                
+
                 k3_v = torch.matmul(kernel_3, value)
                 k1_k2inv = torch.matmul(kernel_1, kernel_2_inv)
                 attention_weighted_value = torch.matmul(k1_k2inv, k3_v)
 
             except RuntimeError as e:
                 # print(f"Error in RRLS Nystrom attention: {e}. Falling back to standard attention.")
-                # Fallback to standard attention (original fallback logic)
-                use_nystrom = False # Signal to use standard attention
+                # Fallback to standard attention
+                use_nystrom = False 
 
         if not use_nystrom or actual_landmarks_dim == 0: # Fallback or no landmarks to use
-            print(f"Using standard attention with q_seq_len={q_seq_len}, k_seq_len={k_seq_len}")
+            # print(f"Using standard attention with q_seq_len={q_seq_len}, k_seq_len={k_seq_len}")
             key_transposed = torch.transpose(key, 1, 2)
             attention_weights = torch.matmul(query, key_transposed)
             if self.mask and mask_tensor is not None: # mask_tensor is (B, Q_len, K_len)
                 attention_weights = attention_weights.masked_fill(
-                    mask_tensor == 0, float('-inf')
+                    mask_tensor == 0, float('-inf') 
                 )
             attention_weights = F.softmax(attention_weights, dim=-1)
             attention_weighted_value = torch.matmul(attention_weights, value)
         
         if self.use_conv:
-            pass # v_conv is not used.
+            pass 
 
         attention_weighted_value = self.dropout(attention_weighted_value)
         return attention_weighted_value
     
-    # iterative_inv is a custom pinverse, but torch.pinverse is used.
     def iterative_inv(self, mat, n_iter=6):
         I = torch.eye(mat.size(-1), device=mat.device)
         K = mat
@@ -485,18 +452,13 @@ class NystromMultiHeadAttention(nn.Module):
             [NystromSelfAttention(embed_dim, d_k, d_v, num_landmarks, mask, CUDA, conv_kernel_size, rrls_gamma, rrls_lmbda_0) for _ in range(num_heads)]
         )
         self.output_linear = nn.Linear(num_heads * d_v, embed_dim) # Output projection
-        self.norm = LayerNorm(embed_dim) # embed_dim matches residual_x and final output
+        self.norm = LayerNorm(embed_dim) 
         self.CUDA = CUDA
         self.device = torch.device("cuda:0" if CUDA else "cpu")
 
     def forward(self, query, key, value, residual_x):
         # query, key, value: (B, SeqLen, embed_dim)
         # residual_x: (B, SeqLen_Q, embed_dim)
-        
-        # Before embed_dim split QKV into d_k for each head,
-        # NystromSelfAttention takes full embed_dim and projects to d_k internally.
-        # Here, each head gets the same Q, K, V and produces d_v output.
-        # These are then concatenated.
         
         head_outputs = []
         for attention in self.attention_blocks:
@@ -508,11 +470,7 @@ class NystromMultiHeadAttention(nn.Module):
         # Project back to embed_dim
         attention_out_projected = self.output_linear(attention_out_concat) # (B, Q_len, embed_dim)
         
-        # Add & Norm
-        # Ensure residual_x has the same Q_len as attention_out_projected
-        # query input to attention had Q_len, so output also has Q_len. residual_x should match query's seq_len.
         if attention_out_projected.shape != residual_x.shape:
-            print("error line 514, attention_out_projected.shape != residual_x.shape")
              pass
 
         add_and_norm = self.norm(attention_out_projected + residual_x)
@@ -526,7 +484,7 @@ class NystromTransformerBlock(nn.Module):
         self.multi_head_attention = NystromMultiHeadAttention(
             embed_dim,
             embed_dim // num_heads, # d_k per head
-            embed_dim // num_heads, # d_v per head
+            embed_dim // num_heads, # 
             num_heads,
             num_landmarks,
             mask,
@@ -535,17 +493,16 @@ class NystromTransformerBlock(nn.Module):
             rrls_gamma=rrls_gamma,
             rrls_lmbda_0=rrls_lmbda_0
         )
-        self.feed_forward = PositionWiseFeedForward(embed_dim, embed_dim)
+        self.feed_forward = PositionWiseFeedForward(embed_dim, embed_dim) 
 
     def forward(self, query, key, value, residual_x):
-        # query for self-attention
+
         attention_out = self.multi_head_attention(query, key, value, residual_x)
-        # The residual for FFN is the output of attention + its own residual
-        feed_forward_out = self.feed_forward(attention_out, attention_out) # Pass attention_out as residual to FFN
+        feed_forward_out = self.feed_forward(attention_out, attention_out)
         return feed_forward_out
 
 """
-Non-Nystrom Code
+Non-Nystrom Code ( остальное без изменений )
 """
 
 class LayerNorm(nn.Module):
@@ -559,6 +516,7 @@ class LayerNorm(nn.Module):
     def forward(self, x):
         mean = x.mean(-1, keepdim=True)
         std = x.std(-1, keepdim=True)
+
         return self.scale * (x - mean) / (std + self.eps) + self.shift
 
 
@@ -566,17 +524,17 @@ class PositionWiseFeedForward(nn.Module):
     def __init__(self, embed_dim, ff_hidden_dim, dropout=0.1): 
         super(PositionWiseFeedForward, self).__init__()
         self.l1 = nn.Linear(embed_dim, ff_hidden_dim)
-        self.RELU = nn.ReLU() # Corrected: was torch.max(torch.zeros(x.shape), self.l1(x)) which is just ReLU
+        self.RELU = nn.ReLU() 
         self.l2 = nn.Linear(ff_hidden_dim, embed_dim)
         self.norm = LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, residual_x):
+    def forward(self, x, residual_x): 
         out = self.l1(x)
         out = self.RELU(out)
-        out = self.dropout(out) # Dropout after activation or before second linear
+        out = self.dropout(out) 
         out = self.l2(out)
-        out = self.dropout(out) # Dropout after second linear, before residual
+        out = self.dropout(out)
         return self.norm(out + residual_x)
 
 
@@ -594,45 +552,33 @@ class Embeddings(nn.Module):
     def __init__(self, vocab_length, embed_dim, CUDA=False, max_len=5000): 
         super(Embeddings, self).__init__()
         self.lut = nn.Embedding(vocab_length, embed_dim)
+
         self.pos_encode = PositionalEncoding(embed_dim, max_len=max_len, CUDA=CUDA) 
         self.embed_dim = embed_dim
-        # Dropout is applied after adding positional encoding
-        # Might need to adjust dropout rate?
-        self.dropout = nn.Dropout(0.1)
+        self.dropout = nn.Dropout(0.1) # May need to modify
 
-    def forward(self, x): # x is token indices
+    def forward(self, x):
+        embed = self.lut(x) * math.sqrt(self.embed_dim)
         return self.dropout(self.pos_encode(embed))
 
 
 class PositionalEncoding(nn.Module):
     "Modified From Annotated Transformer (HarvardNLP)"
-    def __init__(self, embed_dim, max_len=5000, CUDA=False):
+    def __init__(self, embed_dim, max_len=5000, CUDA=False): 
         super(PositionalEncoding, self).__init__()
-        # self.dropout = nn.Dropout(p=dropout) # Optional dropout
+        # self.dropout = nn.Dropout(p=dropout) # Optional
         pe = torch.zeros(max_len, embed_dim)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, embed_dim, 2, dtype=torch.float) * (-math.log(10000.0) / embed_dim))
         
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term) 
-        
         pe = pe.unsqueeze(0) # Shape: (1, max_len, embed_dim)
         if CUDA: 
             pe = pe.to(torch.device("cuda:0")) 
         self.register_buffer("pe", pe)
 
-    def forward(self, x): # x shape: (batch_size, seq_len, embed_dim)
+    def forward(self, x):
         x = x + self.pe[:, :x.size(1), :]
-        # return self.dropout(x) # Optional dropout
+        # return self.dropout(x) # Optional
         return x
-
-
-
-
-
-
-
-
-
-
-        
