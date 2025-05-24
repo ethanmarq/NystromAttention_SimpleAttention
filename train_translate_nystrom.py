@@ -112,6 +112,9 @@ for epoch in range(num_epochs):
         """
         model.train()
 
+        # Traceback for Nan values
+        torch.autograd.set_detect_anomaly(True)
+
         ###################
         # Zero Gradients
         model.zero_grad()

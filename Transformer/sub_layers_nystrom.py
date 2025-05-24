@@ -39,7 +39,7 @@ def _recursive_nystrom_pytorch(
     dtype = X.dtype
 
     if n_components <= 0:
-        # print("Warning: n_components <= 0. Returning empty tensor.")
+        print("Warning: n_components <= 0. Returning empty tensor.") # debug
         empty_indices = torch.tensor([], dtype=torch.long, device=device)
         if return_leverage_score:
             empty_scores = torch.tensor([], dtype=dtype, device=device)
@@ -47,7 +47,7 @@ def _recursive_nystrom_pytorch(
         return empty_indices
         
     if N == 0 : # If input X itself is empty
-        # print("Warning: Input X is empty. Returning empty tensor.")
+        print("Warning: Input X is empty. Returning empty tensor.") # debug
         empty_indices = torch.tensor([], dtype=torch.long, device=device)
         if return_leverage_score:
             empty_scores = torch.tensor([], dtype=dtype, device=device)
@@ -55,7 +55,7 @@ def _recursive_nystrom_pytorch(
         return empty_indices
 
     if n_components >= N:
-        # print(f"Warning: n_components ({n_components}) >= N ({N}). Returning all indices.")
+        print(f"Warning: n_components ({n_components}) >= N ({N}). Returning all indices.") # debug
         indices = torch.arange(N, device=device)
         if return_leverage_score:
             scores = torch.ones(N, device=device, dtype=dtype) * (n_components / N) # Or just 1s
@@ -82,7 +82,7 @@ def _recursive_nystrom_pytorch(
 
     initial_sample_size = min(size_list[-1], N)
     if initial_sample_size <= 0: # Should be caught by N==0 earlier, but as safeguard
-        # print("Warning: Calculated initial sample size is non-positive.")
+        print("Warning: Calculated initial sample size is non-positive.") # debug
         empty_indices = torch.tensor([], dtype=torch.long, device=device)
         if return_leverage_score:
             empty_scores = torch.tensor([], dtype=dtype, device=device)
@@ -98,14 +98,14 @@ def _recursive_nystrom_pytorch(
         if k_diag.shape[0] != N:
             raise ValueError(f"kernel_func(X, None) returned shape {k_diag.shape}, expected ({N},)")
         if not torch.isfinite(k_diag).all():
-            # print("Warning: Non-finite values in kernel diagonal. Clamping.")
+            print("Warning: Non-finite values in kernel diagonal. Clamping.") # debug
             k_diag = torch.nan_to_num(k_diag, nan=1.0, posinf=1.0, neginf=0.0)
     except Exception as e:
         raise RuntimeError(f"Error calling kernel_func(X, None): {e}")
 
     for l in reversed(range(n_levels + 1)):
         if indices.numel() == 0:
-            # print(f"Error: Landmark set became empty at level {l}. Returning empty.")
+            print(f"Error: Landmark set became empty at level {l}. Returning empty.") # debug
             final_empty_indices = torch.tensor([], dtype=torch.long, device=device)
             if return_leverage_score:
                 final_empty_scores = torch.zeros(N, device=device, dtype=dtype) # Return zero scores for all
@@ -124,7 +124,7 @@ def _recursive_nystrom_pytorch(
             KS = kernel_func(X_current, X_landmarks)
             SKS = kernel_func(X_landmarks, X_landmarks)
             if not torch.isfinite(KS).all() or not torch.isfinite(SKS).all():
-                # print(f"Warning: Non-finite values in KS or SKS at level {l}. Clamping.")
+                print(f"Warning: Non-finite values in KS or SKS at level {l}. Clamping.") # debug
                 KS = torch.nan_to_num(KS)
                 SKS = torch.nan_to_num(SKS)
         except Exception as e:
@@ -140,14 +140,14 @@ def _recursive_nystrom_pytorch(
                 diag_SKS = torch.diag(SKS)
                 trace_weighted_SKS = torch.sum(diag_SKS * (weights**2))
                 if not torch.isfinite(weighted_SKS).all():
-                    # print("Warning: Non-finite values in weighted_SKS. Clamping.")
+                    print("Warning: Non-finite values in weighted_SKS. Clamping.") # debug
                     weighted_SKS = torch.nan_to_num(weighted_SKS)
                 if not torch.allclose(weighted_SKS, weighted_SKS.T, atol=1e-5):
-                    # print("Warning: weighted_SKS is not symmetric. Symmetrizing.")
+                    print("Warning: weighted_SKS is not symmetric. Symmetrizing.") # debug
                     weighted_SKS = (weighted_SKS + weighted_SKS.T) / 2.0
                 eigvals = torch.linalg.eigvalsh(weighted_SKS)
                 if not torch.isfinite(eigvals).all():
-                    # print(f"Warning: Non-finite eigenvalues detected at level {l}. Using fallback lambda.")
+                    print(f"Warning: Non-finite eigenvalues detected at level {l}. Using fallback lambda.") # debug
                     lmbda_val = torch.maximum(torch.tensor(lmbda_0 * num_landmarks_in_sample, device=device, dtype=dtype), trace_weighted_SKS / current_k)
                 else:
                     sum_largest_k_eigvals = torch.sum(eigvals[-current_k:])
@@ -155,10 +155,10 @@ def _recursive_nystrom_pytorch(
                     lmbda_calc = torch.clamp(lmbda_calc, min=0.0)
                     lmbda_val = torch.maximum(torch.tensor(lmbda_0 * num_landmarks_in_sample, device=device, dtype=dtype), lmbda_calc)
             except torch.linalg.LinAlgError: # Removed 'as e' as e is not used
-                # print(f"Warning: Eigenvalue computation failed at level {l}. Using fallback lambda.")
+                print(f"Warning: Eigenvalue computation failed at level {l}. Using fallback lambda.") # debug
                 lmbda_val = torch.tensor(lmbda_0 * num_landmarks_in_sample + 1e-5, device=device, dtype=dtype)
-            except Exception: # Removed 'as e'
-                # print(f"Warning: Unexpected error during lambda calculation at level {l}. Using fallback.")
+            except Exception:
+                print(f"Warning: Unexpected error during lambda calculation at level {l}. Using fallback.") # debug
                 lmbda_val = torch.tensor(lmbda_0 * num_landmarks_in_sample + 1e-5, device=device, dtype=dtype)
         
         lmbda = torch.maximum(lmbda_val, torch.tensor(1e-8, device=device, dtype=dtype))
@@ -174,13 +174,13 @@ def _recursive_nystrom_pytorch(
             leverage_score_unscaled = torch.clamp(current_k_diag - row_sums_R_KS, min=0.0)
             leverage_score_values = (1.0 / lmbda) * leverage_score_unscaled
             if not torch.isfinite(leverage_score_values).all():
-                # print(f"Warning: Non-finite leverage scores computed at level {l}. Clamping.")
+                print(f"Warning: Non-finite leverage scores computed at level {l}. Clamping.") # debug
                 leverage_score_values = torch.nan_to_num(leverage_score_values, nan=0.0, posinf=1.0)
         except torch.linalg.LinAlgError: # Removed 'as e'
-            # print(f"Warning: Linear algebra error during RLS computation at level {l}. Falling back to uniform.")
+            print(f"Warning: Linear algebra error during RLS computation at level {l}. Falling back to uniform.") # debug
             leverage_score_values = None
-        except Exception: # Removed 'as e'
-            # print(f"Warning: Unexpected error during RLS computation at level {l}. Falling back to uniform.")
+        except Exception:
+            print(f"Warning: Unexpected error during RLS computation at level {l}. Falling back to uniform.") # debug
             leverage_score_values = None
 
         if leverage_score_values is None:
@@ -190,14 +190,14 @@ def _recursive_nystrom_pytorch(
             p = torch.clamp(leverage_score_values, min=0.0)
             p_sum = torch.sum(p)
             if p_sum <= 1e-10:
-                # print("Warning: Final leverage scores sum to <= 0. Using uniform probabilities.")
+                print("Warning: Final leverage scores sum to <= 0. Using uniform probabilities.") # debug
                 p = torch.ones_like(p) / max(1, p.numel())
             else:
                 p = p / p_sum
             
             final_n_components = min(n_components, p.numel())
-            # if final_n_components < n_components:
-            #     print(f"Warning: Requested n_components ({n_components}) > available points ({p.numel()}). Sampling {final_n_components}.")
+            if final_n_components < n_components:
+                print(f"Warning: Requested n_components ({n_components}) > available points ({p.numel()}). Sampling {final_n_components}.") # debug
             
             if p.numel() > 0 and final_n_components > 0:
                 sampled_relative_indices = torch.multinomial(p, num_samples=final_n_components, replacement=False, generator=generator)
@@ -216,7 +216,7 @@ def _recursive_nystrom_pytorch(
             sampled_relative_indices = torch.where(rand_vals < sampling_prob)[0]
 
             if sampled_relative_indices.numel() == 0:
-                # print(f"Warning: No points sampled via RLS at level {l}. Falling back to uniform.")
+                print(f"Warning: No points sampled via RLS at level {l}. Falling back to uniform.") # debug
                 num_fallback_samples = min(max(1, n_components // (n_levels + 1 if n_levels > -1 else 1)), current_subset_size)
                 if current_subset_size > 0:
                     fallback_perm = torch.randperm(current_subset_size, device=device, generator=generator)
@@ -236,7 +236,7 @@ def _recursive_nystrom_pytorch(
                 weights = torch.tensor([], dtype=dtype, device=device)
     
     # Fallback return (should ideally be caught by the l==0 branch)
-    # print("Warning: Recursive Nystrom loop finished unexpectedly (reached end of function).")
+    print("Warning: Recursive Nystrom loop finished unexpectedly (reached end of function).") # debug
     final_fallback_indices = torch.tensor([], dtype=torch.long, device=device)
     if 'final_indices' in locals() and final_indices.numel() > 0: return final_indices
     elif indices.numel() > 0: return indices # Return current sample if loop exited early
@@ -410,12 +410,12 @@ class NystromSelfAttention(nn.Module):
                 attention_weighted_value = torch.matmul(k1_k2inv, k3_v)
 
             except RuntimeError as e:
-                # print(f"Error in RRLS Nystrom attention: {e}. Falling back to standard attention.")
+                print(f"Error in RRLS Nystrom attention: {e}. Falling back to standard attention.") # debug
                 # Fallback to standard attention
                 use_nystrom = False 
 
         if not use_nystrom or actual_landmarks_dim == 0: # Fallback or no landmarks to use
-            # print(f"Using standard attention with q_seq_len={q_seq_len}, k_seq_len={k_seq_len}")
+            print(f"Using standard attention with q_seq_len={q_seq_len}, k_seq_len={k_seq_len}") # debug
             key_transposed = torch.transpose(key, 1, 2)
             attention_weights = torch.matmul(query, key_transposed)
             if self.mask and mask_tensor is not None: # mask_tensor is (B, Q_len, K_len)
@@ -502,7 +502,7 @@ class NystromTransformerBlock(nn.Module):
         return feed_forward_out
 
 """
-Non-Nystrom Code ( остальное без изменений )
+Non-Nystrom Code
 """
 
 class LayerNorm(nn.Module):
