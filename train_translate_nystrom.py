@@ -153,6 +153,7 @@ for epoch in range(num_epochs):
         # BackProp
         loss = criterion(all_outs, item["logits"][:, 1:, :]) #Shift one so as not to predict start token
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1) # Modify max_norm, this should fix nan gradients, Try 0.5, 1, and 5
         optimizer.step()
         ###################
 

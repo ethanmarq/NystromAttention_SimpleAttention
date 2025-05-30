@@ -267,7 +267,7 @@ class NystromSelfAttention(nn.Module):
 
         self.rrls_gamma = rrls_gamma
         self.rrls_lmbda_0 = rrls_lmbda_0
-        # self.rrls_seed_counter = 0 # Optional
+        self.rrls_seed_counter = 0 # Optional: Line 289 and 290 must be uncommented
 
         self.use_conv = conv_kernel_size is not None
         if self.use_conv:
@@ -286,8 +286,9 @@ class NystromSelfAttention(nn.Module):
         
         landmark_list = []
         # Optional
-        # current_seed = self.rrls_seed_counter if hasattr(self, 'rrls_seed_counter') else None
-        # if current_seed is not None: self.rrls_seed_counter +=1
+        current_seed = self.rrls_seed_counter if hasattr(self, 'rrls_seed_counter') else None
+        if current_seed is not None: self.rrls_seed_counter +=1
+            #
 
         for i in range(batch_size):
             current_item = tensor_3d[i]  # Shape: (seq_len, d_features)
